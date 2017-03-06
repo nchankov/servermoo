@@ -1,3 +1,3 @@
 #!/bin/bash
 
-#Servermoo.sh monitoring agent
+#Servermoo.sh installation script
