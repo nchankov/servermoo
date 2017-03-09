@@ -1,2 +1,3 @@
-# servermoo
-servermoo.com monitoring agent 
+# Servermoo Agent
+
+Servermoo is a system for monitoring the health of your server.
