@@ -2,7 +2,7 @@
 #
 # servermoo 	Servermoo daemon
 # 
-# chkconfig: - 64 36
+# chkconfig: 234 64 36
 # description:  Servermoo monitoring agent daemon
 # processname: servermoo
 # config: /etc/servermoo.api
@@ -126,6 +126,7 @@ uninstall() {
 		fi
 
 		if [ -f /sbin/chkconfig ]; then
+			chkconfig servermoo off
 			chkconfig --del servermoo
 		fi
 		
