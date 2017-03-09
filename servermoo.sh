@@ -140,6 +140,7 @@ install() {
 
 		if [ -f /sbin/chkconfig ]; then
 			chkconfig --add servermoo
+			chkconfig servermoo on
 		fi
 
 		echo "Attempting to start the daemon..."
