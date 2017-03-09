@@ -81,7 +81,7 @@ get_api_key() {
 install() {
 	
 	# Create a temp file
-	SERVICE_FILE=$(tempfile)
+	SERVICE_FILE=$(mktemp)
 
 	echo ""
 	echo ""
@@ -95,7 +95,7 @@ install() {
 	echo "Downloading the servermoo.sh agent ..."
 	
 	# Downloading the file
-	curl -o "$SERVICE_FILE" --silent $AGENT_URL
+	curl -s -o "$SERVICE_FILE" $AGENT_URL
 	
 	# Changing the file permissions
 	chmod +x "$SERVICE_FILE"
@@ -107,7 +107,7 @@ install() {
 	echo "Downloading the servermoo.sh daemon ..."
 	
 	# Download the daemon
-	curl -o "$SERVICE_FILE" --silent $DAEMON_URL
+	curl -s -o "$SERVICE_FILE" $DAEMON_URL
 	
 	# Changing the file permissions
 	chmod +x "$SERVICE_FILE"
@@ -132,7 +132,15 @@ install() {
 
 		# Attempting to add the daemon into startup scripts so it will
 		# start on boot
-		update-rc.d servermoo defaults
+		
+		# Debian and alike
+		if [ -f /usr/sbin/update-rc.d ]; then
+			update-rc.d servermoo defaults
+		fi
+
+		if [ -f /sbin/chkconfig ]; then
+			chkconfig --add servermoo
+		fi
 
 		echo "Attempting to start the daemon..."
 
