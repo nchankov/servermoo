@@ -1,4 +1,13 @@
 #!/bin/bash
+#
+# servermoo 	Servermoo daemon
+# 
+# chkconfig: - 64 36
+# description:  Servermoo monitoring agent daemon
+# processname: servermoo
+# config: /etc/servermoo.api
+# pidfile: /var/run/servermoo.pid
+# 
 
 ######################################################
 #                                                    #
@@ -111,7 +120,14 @@ uninstall() {
 		stop
 
 		# Removing daemon from boot sequence
-		update-rc.d -f servermoo remove
+		
+		if [ -f /usr/sbin/update-rc.d ]; then
+			update-rc.d -f servermoo remove
+		fi
+
+		if [ -f /sbin/chkconfig ]; then
+			chkconfig --del servermoo
+		fi
 		
 		# Remove the main agent file
 		if [ -f $SCRIPT ]; then
