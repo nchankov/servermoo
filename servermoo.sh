@@ -91,11 +91,16 @@ install() {
     echo "#                                                       #"
     echo "#########################################################"
 	echo ""
-
-	echo "Downloading the servermoo.sh agent ..."
 	
-	# Downloading the file
-	curl -s -o "$SERVICE_FILE" $AGENT_URL
+	# Downloading the file if there is no local file in the same directory
+	if [ ! -f ./agent.sh ]; then
+		echo "Downloading the servermoo.sh agent ..."
+		curl -s -o "$SERVICE_FILE" $AGENT_URL
+	else 
+		#move the agent to $SERVICE_FILE
+		echo "Copy the agent file ..."
+		cp -v ./agent.sh $SERVICE_FILE 
+	fi
 	
 	# Changing the file permissions
 	chmod +x "$SERVICE_FILE"
@@ -103,11 +108,16 @@ install() {
 	# Move the file to it's location
 	mv -v $SERVICE_FILE $AGENT_LOCATION
 	
+	# Download the daemon if there is no local file in the same directory
+	if [ ! -f ./daemon.sh ]; then
+		echo "Downloading the servermoo.sh daemon ..."
+		curl -s -o "$SERVICE_FILE" $DAEMON_URL
+	else 
+		#move the agent to $SERVICE_FILE
+		echo "Copy the daemon file ..."
+		cp -v ./daemon.sh $SERVICE_FILE 
+	fi
 
-	echo "Downloading the servermoo.sh daemon ..."
-	
-	# Download the daemon
-	curl -s -o "$SERVICE_FILE" $DAEMON_URL
 	
 	# Changing the file permissions
 	chmod +x "$SERVICE_FILE"
