@@ -283,6 +283,6 @@ while :
 do
 	
 	submit_data
-	sleep 20
+	sleep 60
 
 done
