@@ -1,0 +1,39 @@
+#!/bin/bash
+
+######################################################
+#                                                    #
+# Get server hdd info                                #
+#                                                    #
+######################################################
+#
+storage() {
+
+	local disks
+	
+	local fs size used avail use mnt
+	
+	local i=0
+
+	# Loop through all disks
+	while IFS=$': \t' read fs size used avail use mnt; 
+	do
+		
+		# Single disk node
+		disks="$disks{
+			\"resource\": \"$mnt\",
+			\"max\": \"$size\",
+			\"used\": \"$used\"
+		},"
+
+	done< <(df | tail -n+2)
+	
+	# Remove the last comma and 
+	# Construct the disks node
+	echo "{
+		\"group\": \"Storage\",
+		\"resources\": [
+			${disks::-1}
+		]
+	}"
+
+}

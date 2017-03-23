@@ -9,70 +9,158 @@
 #########################################
 
 #
-# Location of the agent file
-#
-AGENT_URL="https://raw.githubusercontent.com/nchankov/servermoo/master/agent.sh"
-
-#
-# Location of the daemon file
-#
-DAEMON_URL="https://raw.githubusercontent.com/nchankov/servermoo/master/daemon.sh"
-
-
-#
-# Location where the api key will be stored
-#
-API_LOCATION="/etc/servermoo.api"
-
-#
-# Location of the commands
+# Where the config file will be placed.
 # 
-COMMANDS_LOCATION="/etc/servermoo/"
+CONFIG_FILE="/etc/servermoo.conf"
 
 #
-# Agent Location
+# Where is the main directory of the agent
 #
-AGENT_LOCATION="/usr/bin/servermoo.sh"
+SERVERMOO_DIR="/usr/share/servermoo"
 
+# Where is the daemon location
 #
-# Daemon Location
-#
-DAEMON_LOCATION="/etc/init.d/servermoo"
+DAEMON_DIR="/etc/init.d"
 
+# 
+# The directory of this script
+#
+CURRENT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 #
 # Asking for api key and store it in to a file file
 #
 get_api_key() {
-	
-	if [ ! -f "$API_LOCATION" ]; then
-		
-		echo ""
-		
+
+	# Check if the servermoo location exists in the /etc folder
+	# and if not request the api key in the user prompt
+	if [ ! -f "$CONFIG_FILE" ]; then
+		echo "" # for better spacing
+
 		# Ask the user to provide the api key
 		read -p "Please provide your api key: " api
 		
 		# Check if the user pass any info
 		if [ ! -z "$api" ]; then
 			
-			# Store the api key to the predefined location
-			echo $api > $API_LOCATION
-			echo "The api key has been stored in $API_LOCATION"
-		
+			# Check if there is template configuration file
+			if [ -f "$CURRENT_DIR/servermoo.conf.dist" ]; then
+
+				echo "Copy the configuration file into it's place..."
+				# Copy the template location into the config dir
+				cp -v $CURRENT_DIR/servermoo.conf.dist $CONFIG_FILE 
+
+				#replace the api sting into the config file
+				sed  -i "s/YOUR_SERVERMOO_API_KEY/$api/g" $CONFIG_FILE
+			fi
+
+			echo "Config file is stored at $CONFIG_FILE"
+			echo ""
 		else
 			
 			# If there is no api key provided print a message and stop here
 			echo ""
 			echo "The servermoo init has been terminated"
+			echo "Reason: no api key has been provided"
 			echo ""
 
 		fi
 
 	else
 		
-		echo "The api key is already in $API_LOCATION"
+		echo "The servermoo config file is already in $CONFIG_FILE"
+
+	fi
+
+}
+
+# 
+# Place the files in their locations
+# This include agent.sh daemon.sh and plugins
+# 
+place_files() {
+	
+	# Create servermoo directory if not exists
+	if [ ! -d $SERVERMOO_DIR ]; then
+	
+		mkdir $SERVERMOO_DIR
 	
 	fi
+
+	# Copy the agent.sh into the scripts main directory
+	if [ -f "$CURRENT_DIR/agent.sh" ]; then
+	
+		echo "Copy the agent file ..."
+		cp -v $CURRENT_DIR/agent.sh $SERVERMOO_DIR 
+
+		# Changing the file permissions
+		chmod +x "$SERVERMOO_DIR/agent.sh"
+	
+	else 
+	
+		echo "Error: File agent.sh is not found in the current directory"
+	
+	fi
+
+	# Move the daemon to it's location
+	if [ -f "$CURRENT_DIR/daemon.sh" ]; then
+	
+		echo "Copy the daemon file ..."
+		cp -v $CURRENT_DIR/daemon.sh "$DAEMON_DIR/servermoo" 
+		
+		# Changing the file permissions
+		chmod +x "$DAEMON_DIR/servermoo"
+	
+	else 
+		
+		echo "Error: File daemon.sh is not found in the current directory"
+	
+	fi
+
+	# Copy the plugins directory
+	if [ -d "$CURRENT_DIR/plugins" ]; then
+	
+		echo "Copy the plugins ..." 
+		cp -vR "$CURRENT_DIR/plugins" $SERVERMOO_DIR
+	
+	fi
+
+	# Create the scripts directory
+	if [ ! -d "$SERVERMOO_DIR/scripts" ]; then
+	
+		echo "Creating scripts directory ..." 
+		mkdir -v "$SERVERMOO_DIR/scripts"
+	
+	fi
+
+}
+
+#
+# Attempting to start the daemon and 
+# adding it to the start sequence on boot
+#
+start_daemon() {
+	
+	# Debian and alike
+	if [ -f /usr/sbin/update-rc.d ]; then
+	
+		update-rc.d servermoo defaults
+	
+	fi
+
+	# RPM systems
+	if [ -f /sbin/chkconfig ]; then
+	
+		chkconfig --add servermoo
+		chkconfig servermoo on
+	
+	fi
+
+	echo "Attempting to start the daemon..."
+
+	# Start the daemon
+	$DAEMON_DIR/servermoo start
+
 }
 
 # 
@@ -80,9 +168,6 @@ get_api_key() {
 # 
 install() {
 	
-	# Create a temp file
-	SERVICE_FILE=$(mktemp)
-
 	echo ""
 	echo ""
 	echo "#########################################################"
@@ -92,81 +177,43 @@ install() {
     echo "#########################################################"
 	echo ""
 	
-	# Downloading the file if there is no local file in the same directory
-	if [ ! -f ./agent.sh ]; then
-		echo "Downloading the servermoo.sh agent ..."
-		curl -s -o "$SERVICE_FILE" $AGENT_URL
-	else 
-		#move the agent to $SERVICE_FILE
-		echo "Copy the agent file ..."
-		cp -v ./agent.sh $SERVICE_FILE 
-	fi
-	
-	# Changing the file permissions
-	chmod +x "$SERVICE_FILE"
-
-	# Move the file to it's location
-	mv -v $SERVICE_FILE $AGENT_LOCATION
-	
-	# Download the daemon if there is no local file in the same directory
-	if [ ! -f ./daemon.sh ]; then
-		echo "Downloading the servermoo.sh daemon ..."
-		curl -s -o "$SERVICE_FILE" $DAEMON_URL
-	else 
-		#move the agent to $SERVICE_FILE
-		echo "Copy the daemon file ..."
-		cp -v ./daemon.sh $SERVICE_FILE 
-	fi
-
-	
-	# Changing the file permissions
-	chmod +x "$SERVICE_FILE"
-	
-	# Move the file to it's location
-	mv -v $SERVICE_FILE $DAEMON_LOCATION
-
-	#ask for api key and store it
+	#
+	# Request an api key from user input
+	# 
 	get_api_key
-
-	if [ -f "$API_LOCATION" ]; then
-		
-		if [ ! -d $COMMANDS_LOCATION ]; then
-			
-			echo "Creating storage for commands"
-			
-			mkdir -v $COMMANDS_LOCATION
-
-		fi
-
-		echo "Installation has been complete"
-
-		# Attempting to add the daemon into startup scripts so it will
-		# start on boot
-		
-		# Debian and alike
-		if [ -f /usr/sbin/update-rc.d ]; then
-			update-rc.d servermoo defaults
-		fi
-
-		if [ -f /sbin/chkconfig ]; then
-			chkconfig --add servermoo
-			chkconfig servermoo on
-		fi
-
-		echo "Attempting to start the daemon..."
-
-		# Start the daemon
-		$DAEMON_LOCATION start
+	if [ $? -ne 0 ]; then
+		exit
 	fi
+
+
+	#
+	# Try to place the files into the appropriate locations 
+	# 
+	place_files
+	if [ $? -ne 0 ]; then
+		exit
+	fi
+
+	start_daemon
+	if [ $? -ne 0 ]; then
+		exit
+	fi
+	
+	echo "Servermoo instalation has been complete"
+
 }
 
 #
 # Just calling the daemon uninstall option which will do the rest
 #
 uninstall() {
-	if [ -f $DAEMON_LOCATION ]; then 
-		$DAEMON_LOCATION uninstall
+
+	if [ -f "$DAEMON_DIR/servermoo" ]; then 
+
+		$DAEMON_DIR/servermoo uninstall
+
 	fi
+
 }
 
 #switch between the cases

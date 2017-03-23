@@ -1,0 +1,39 @@
+#!/bin/bash
+
+######################################################
+#                                                    #
+# Get server memory & swap                           #
+#                                                    #
+######################################################
+
+memory() {
+	
+	# Available memory in bytes
+	local available_memory=`free | awk 'NR==2{printf "%s", $2}'`
+	
+	# Used memory in bytes
+	local used_memory=`free | awk 'NR==2{printf "%s", $3 }'`
+
+	# Available swap
+	local available_swap=`free | awk 'NR==4{printf "%s", $2}'`
+
+	# Used swap
+	local used_swap=`free | awk 'NR==4{printf "%s", $3}'`
+	
+	# Construct the result
+	echo "{
+		\"group\": \"Memory\",
+		\"resources\": [
+			{
+				\"resource\": \"RAM\",
+				\"max\": \"$available_memory\",
+				\"used\": \"$used_memory\"
+			},
+			{
+				\"resource\": \"Swap\",
+				\"max\": \"$available_swap\", 
+				\"used\": \"$used_swap\"
+			}
+		]
+	}"
+}

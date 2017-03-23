@@ -6,8 +6,16 @@
 # description:  Servermoo monitoring agent daemon
 # processname: servermoo
 # config: /etc/servermoo.api
-# pidfile: /var/run/servermoo.pid
+# pid_file: /var/run/servermoo.pid
 # 
+### BEGIN INIT INFO
+# Provides:          servermoo
+# Required-Start:    $network $syslog
+# Required-Stop:     $network $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start servermoo agent at boot time
+### END INIT INFO
 
 ######################################################
 #                                                    #
@@ -17,52 +25,47 @@
 #                                                    #
 ######################################################
 
+CONFIG_FILE="/etc/servermoo.conf"
+
+#
+# include the configuration file
+# 
+source $CONFIG_FILE
+
 #
 # The script which we will execute
 #
-SCRIPT=/usr/bin/servermoo.sh
+SCRIPT="$SERVERMOO_DIR/agent.sh"
 
 #
-# The user which will be used to execute the script
-# By default it's root and it's important to be
-# "powerful" enough so if can run the commands from
-# /etc/servermoo/ directory.
-# 
-# If you don't intend to use the commands you can change this
-# to someother user
-#
-RUNAS=root
+# Attempt to remove the daemon from the booth sequence
+remove_daemon() {
 
-#
-# Pid file of servermoo it will indicate whether the daemon is 
-# working or not
-#
-PIDFILE=/var/run/servermoo.pid
+	echo "Attempting to remove the daemon..."
+	
+	# Debian and alike
+	if [ -f /usr/sbin/update-rc.d ]; then
+	
+		update-rc.d -f servermoo remove
+	
+	fi
 
-#
-# Log file of the servermoo
-#
-LOGFILE=/var/log/servermoo.log
+	# RPM systems
+	if [ -f /sbin/chkconfig ]; then
+	
+		chkconfig servermoo off
+		chkconfig --del servermoo
+	
+	fi
 
-#
-# Where is the api key
-#
-API_LOCATION=/etc/servermoo.api
-
-#
-# Location of the command files
-# 
-# For more information about commands see
-# https://servermoo.com/docs
-# 
-COMMANDS_LOCATION=/etc/servermoo
+}
 
 #
 # Start the daemon
 #
 start() {
 
-	if [ -f "$PIDFILE" ] && kill -0 $(cat "$PIDFILE"); then
+	if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE"); then
 
 		echo "Service already running." >&2
 
@@ -72,9 +75,9 @@ start() {
 
 	echo 'Starting the service...' >&2
 
-	local CMD="$SCRIPT &> \"$LOGFILE\" & echo \$!"
+	local CMD="$SCRIPT &> \"$LOG_FILE\" & echo \$!"
 
-	su -c "$CMD" $RUNAS > "$PIDFILE"
+	su -c "$CMD" $RUNAS > "$PID_FILE"
 
 	echo 'Service started' >&2
 
@@ -85,7 +88,7 @@ start() {
 # 
 stop() {
 
-	if [ ! -f "$PIDFILE" ] || ! kill -0 $(cat "$PIDFILE"); then
+	if [ ! -f "$PID_FILE" ] || ! kill -0 $(cat "$PID_FILE"); then
 		
 		echo 'Service not running' >&2
 		
@@ -95,7 +98,7 @@ stop() {
 	
 	echo 'Stopping the service...' >&2
 	
-	kill -15 $(cat "$PIDFILE") && rm -f "$PIDFILE"
+	kill -15 $(cat "$PID_FILE") && rm -f "$PID_FILE"
 	
 	echo 'Service stopped' >&2 
 
@@ -106,6 +109,7 @@ stop() {
 # and removing the daemon file
 #
 uninstall() {
+
 	local sure
   
 	echo ""
@@ -120,15 +124,7 @@ uninstall() {
 		stop
 
 		# Removing daemon from boot sequence
-		
-		if [ -f /usr/sbin/update-rc.d ]; then
-			update-rc.d -f servermoo remove
-		fi
-
-		if [ -f /sbin/chkconfig ]; then
-			chkconfig servermoo off
-			chkconfig --del servermoo
-		fi
+		remove_daemon
 		
 		# Remove the main agent file
 		if [ -f $SCRIPT ]; then
@@ -137,34 +133,38 @@ uninstall() {
 		
 		fi
 
-		# Remove the api key file
-		if [ -f $API_LOCATION ]; then
-			
-			rm -fv $API_LOCATION
-		
-		fi
-
 		# Check if the commands directory is empty if so, remove it
 		# otherwise keep it 
-		if [ ! "$(ls -A $COMMANDS_LOCATION)" ]; then
+		if [ ! "$(ls -A $SCRIPTS_DIR)" ]; then
 			
-			rmdir -v $COMMANDS_LOCATION
+			rmdir -v $SCRIPTS_DIR
 		
 		fi
 
+		# Remove plugins directory if it's empty 
+		if [ ! "$(ls -A $PLUGINS_DIR)" ]; then
+			
+			rmdir -v $PLUGINS_DIR
+		
+		fi
+
+		if [ -f $CONFIG_FILE ]; then
+			rm -fv $CONFIG_FILE
+		fi
 		# Removing the daemon itself
 		rm -fv "$0"
 		
 		echo ""
 		echo "All files has been removed except:" >&2
-		echo "'$LOGFILE'" >&2
+		echo "'$LOG_FILE'" >&2
 		
 		# Check if the commands stil exists if so print a message
 		# that it is still there
-		if [ -d $COMMANDS_LOCATION ]; then
-		
-			echo "'$COMMANDS_LOCATION'" >&2
-		
+		if [ -d $SCRIPTS_DIR ]; then
+			echo "'$SCRIPTS_DIR'" >&2
+		fi 
+		if [ -d $PLUGINS_DIR ]; then
+			echo "'$PLUGINS_DIR'" >&2
 		fi 
 		
 		echo ""

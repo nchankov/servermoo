@@ -8,44 +8,17 @@
 #                                                    #
 ######################################################
 
+CONFIG_FILE="/etc/servermoo.conf"
+
+#
+# Include the Servermoo configuration file
 # 
-# The url which the server will hit with the data collected 
-# 
-ENDPOINT='https://api.servermoo.com/endpoint'
-
-#
-# Location where the api key will be stored
-#
-API_LOCATION="/etc/servermoo.api"
-
-#
-# Commands location
-#
-COMMANDS_LOCATION="/etc/servermoo/"
-
-#
-# Get the token stored in a external file
-# 
-get_token() {
-	
-	local api
-	
-	if [ -f "$API_LOCATION" ]; then
-		
-		api=$(<$API_LOCATION)
-		
-		if  [ ! -z "$api" ]; then
-			
-			echo $api
-		
-		fi
-	
-	fi
-
-}
+source $CONFIG_FILE
 
 #
 # Get server ip
+# We are using the outside ip, but this will be used to 
+# identify the server if it's behind a proxy
 # 
 get_ip() {
     
@@ -63,141 +36,79 @@ get_ip() {
     done< <(LANG=C /sbin/ifconfig)
     
     # Construct the ip node
-    echo "\"ip\": \"$myip\","
-
+    echo $myip
 }
 
 #
-# Get server load
-#
-get_cpu () {
-
-	# Get number of processors
-	local processors=`grep -c ^processor /proc/cpuinfo`
-
-	# Get processor loads
-	local load1=`cat /proc/loadavg | awk '{print $1}'` # Last minute
-	
-	local load2=`cat /proc/loadavg | awk '{print $2}'` # Last 5 minutes
-	
-	local load3=`cat /proc/loadavg | awk '{print $3}'` # last 15 minutes
-
-	# Construct the cpu node
-	echo "
-		\"cpu\": {
-			\"processors\": $processors,
-			\"load\": {
-				\"l1\":$load1, 
-				\"l2\": $load2, 
-				\"l3\": $load3
-			}
-		},"
-
-}
-
-#
-# Get server memory
-#
-get_memory() {
-	
-	# Available memory in bytes
-	local available_memory=`free | awk 'NR==2{printf "%s", $2}'`
-	
-	# Used memory in bytes
-	local used_memory=`free | awk 'NR==2{printf "%s", $3 }'`
-
-	# Available swap
-	local available_swap=`free | awk 'NR==4{printf "%s", $2}'`
-
-	# Used swap
-	local used_swap=`free | awk 'NR==4{printf "%s", $3}'`
-	
-	# Construct the memory node
-	echo "\"memory\": {
-		\"physical\": {
-			\"available\": $available_memory, 
-			\"used\": $used_memory
-		},
-		\"swap\": {
-			\"available\": $available_swap, 
-			\"used\": $used_swap
-		}
-	},"
-
-}
-
-#
-# Get server disks
+# collect file names from $SCRIPTS_DIR directory
 # 
-get_disks() {
+get_scripts() {
 
-	local disks
-	
-	local fs size used avail use mnt
-	
-	local i=0
+	local permisions scripts
 
-	# Loop through all disks
-	while IFS=$': \t' read fs size used avail use mnt; 
-	do
-		
-		# Single disk node
-		disks="$disks{
-			\"filesystem\": \"$fs\", 
-			\"size\": \"$size\",
-			\"used\": \"$used\",
-			\"mount\": \"$mnt\"
-		},"
+	# Check if the directory exists and there are files in it
+	if [ -d $SCRIPTS_DIR ] && [ "$(ls -A $SCRIPTS_DIR)" ]; then
 
-	done< <(df | tail -n+2)
-	
-	# Remove the last comma and 
-	# Construct the disks node
-	echo "\"disks\": [${disks::-1}],"
-
-}
-
-#
-# collect file names from /etc/servermoo/ directory
-# 
-get_commands() {
-
-	local permisions commands
-
-	# Check if the directory exists and thereare files in it
-	if [ -d $COMMANDS_LOCATION ] && [ "$(ls -A $COMMANDS_LOCATION)" ]; then
-
-		for f in $COMMANDS_LOCATION*
+		for f in $SCRIPTS_DIR/*
 		do
 
-			# Get file permissions
+			# Get the file permissions
 			permisions=`stat -c %A $f`
 
 			# Add only those files which had owner executable permission
 			if [ `stat -c %A $f | sed 's/...\(.\).\+/\1/'` == "x" ]; then
 			  
-				commands="$commands\"$(basename $f)\","
+				scripts="$scripts\"$(basename $f)\","
 
 			fi
 
 		done
 
-		echo "\"commands\": [${commands::-1}],"
 	fi
+	echo "[${scripts::-1}]"
 }
 
 #
-# Construct the final json string which will be send
+# Construct the final json string from the plugins
 # 
 prepare_data() {
-	
-	# Json contents
-	local json="$(get_ip)$(get_cpu)$(get_memory)$(get_disks)$(get_commands)"
-	
-	# Print the json which will be send to the server
-	# and removing the last comma
-	echo "{"${json::-1}"}"
 
+	# Local variables
+	local module module_name plugin plugin_name
+	local FILES=$PLUGINS_DIR/*.smoo
+
+	# Final result variable
+	local json=""
+
+	# Loop through all files in the plugin directory
+	for plugin in $FILES
+	do
+		# Get basename of the file and remove the suffix
+		plugin_name="$(basename "$plugin")"
+		plugin_name="${plugin_name%.*}"
+
+		# include the plugin file
+		source $plugin
+
+		# Check whether the function exists
+		if [ "$(type -t $plugin_name)" = 'function' ]; then
+	
+			# Plugin function result
+			module="$($plugin_name)"
+			
+			# Append the module to the final result variable
+			json="$json$module,"
+		
+		fi
+	done
+
+	# Return the prepared json
+	# First removing the last trailing comma
+	echo "{
+		\"ip\": \"$(get_ip)\",
+		\"scripts\": $(get_scripts),
+		\"resources\": ["${json::-1}"]
+	}"
 }
 
 #
@@ -230,9 +141,9 @@ process_response() {
 
 #
 # Execute commands in the order of their appearence
-# Servermoo will return only the command names, what is the 
-# command is responsibility of the server admin.
-# Therefore be careful and prorect /etc/servermoo directory and
+# Servermoo will return only the command names, 
+# what is the command is responsibility of the server admin.
+# Therefore be careful and prorect $SCRIPTS_DIR directory and
 # it's contentd from unauthorized access
 #
 execute_response_commands() {
@@ -244,10 +155,10 @@ execute_response_commands() {
 		for command in $(echo $1 | tr "," "\n")
 		do
 			# Check if the file exists
-			if [ -f $COMMANDS_LOCATION$command ]; then
+			if [ -f $SCRIPTS_DIR/$command ]; then
 		  	
 		  		# Execute the script from /etc/servermoo directory  
-		  		eval $COMMANDS_LOCATION$command
+		  		eval $SCRIPTS_DIR/$command
 		  	
 		  	fi
 		done
@@ -266,7 +177,7 @@ submit_data() {
 	# Store response from the curl in a variable	
 	local response=$(curl \
 		-H "Accept: application/json" \
-		-H "X-Token: $(get_token)" \
+		-H "X-Token: $API_KEY" \
 		--silent \
 		-X POST \
 		-d "$(prepare_data)" \
@@ -274,11 +185,15 @@ submit_data() {
 	)
 
 	# Handle the reponse if there are some flags passed
-	process_response $response $start
-	
+	if [ ! -z "$response" ]; then
+		process_response $response $start
+	else
+		echo "$start No response from the server"
+	fi
 }
 
 # Send server call on every 20 seconds
+
 while :
 do
 	

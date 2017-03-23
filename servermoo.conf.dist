@@ -1,0 +1,58 @@
+######################################################
+#                                                    #
+# Servermoo configuration file                       #
+#                                                    #
+######################################################
+
+# Servermoo version
+VERSION=1.00
+
+#
+# Place your api key here
+# 
+API_KEY="YOUR_SERVERMOO_API_KEY"
+
+# 
+# The url which the server will hit with the data collected 
+# 
+ENDPOINT='https://dev.servermoo.com/endpoint.php'
+
+#
+# Main location of the files
+#
+SERVERMOO_DIR="/usr/share/servermoo"
+
+#
+# Plugins location
+#
+PLUGINS_DIR="$SERVERMOO_DIR/plugins"
+
+#
+# Location of the command files
+# 
+# For more information about commands see
+# https://servermoo.com/docs
+# 
+SCRIPTS_DIR="$SERVERMOO_DIR/scripts"
+
+#
+# Log file of the agent script
+#
+LOG_FILE="/var/log/servermoo.log"
+
+#
+# The user which will be used to execute the script
+# By default it's root and it's important to be
+# "powerful" enough so if can run the commands from
+# /etc/servermoo/ directory.
+# 
+# If you don't intend to use the commands you can change this
+# to someother user
+#
+RUNAS="root"
+
+#
+# Pid file of servermoo it will indicate whether the daemon is 
+# working or not
+#
+PID_FILE="/var/run/servermoo.pid"

@@ -1,0 +1,27 @@
+#!/bin/bash
+
+######################################################
+#                                                    #
+# Get server processors & load                       #
+#                                                    #
+######################################################
+
+cpu () {
+
+	# Get number of processors
+	local processors=`grep -c ^processor /proc/cpuinfo`
+
+	# Get processor loads for last 15 minutes
+	# Which eliminate the resk of catching some odd spikes
+	local load3=`cat /proc/loadavg | awk '{print $3}'`
+
+	# Construct the result
+	echo "{
+		\"group\": \"CPU\",
+		\"resource\": {
+			\"resource\": \"processors\",
+			\"max\": $processors,
+			\"used\": $load3
+		}
+	}"
+}
