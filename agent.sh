@@ -65,7 +65,7 @@ get_scripts() {
 		done
 
 	fi
-	echo "[${scripts::-1}]"
+	echo "[${scripts%?}]"
 }
 
 #
@@ -107,7 +107,7 @@ prepare_data() {
 	echo "{
 		\"ip\": \"$(get_ip)\",
 		\"scripts\": $(get_scripts),
-		\"resources\": ["${json::-1}"]
+		\"resources\": ["${json%?}"]
 	}"
 }
 

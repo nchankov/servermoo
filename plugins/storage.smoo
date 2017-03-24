@@ -32,7 +32,7 @@ storage() {
 	echo "{
 		\"group\": \"Storage\",
 		\"resources\": [
-			${disks::-1}
+			${disks%?}
 		]
 	}"
 
